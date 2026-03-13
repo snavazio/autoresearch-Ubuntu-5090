@@ -1,4 +1,59 @@
+
 # autoresearch
+
+I added two files AIprep.py and Main.py, I modified Train.py. 
+Here is a breakdown of what each file does:
+
+1. aiprep.py (The Data Processor)
+This is your preprocessing script. It takes a raw text file and converts it into a format the GPU can digest quickly.
+
+Vocabulary: It builds a character-level vocabulary (mapping every unique character in your text to a number).
+
+Binary Conversion: It converts the text into a sequence of integers and saves them as train.bin and val.bin.
+
+Efficiency: Using .bin files allows train.py to stream data directly into VRAM without the overhead of reading text strings during training.
+
+2. train.py (The Engine)
+This is the heart of the project—a custom GPT implementation optimized for the Blackwell architecture (RTX 5090).
+
+Architecture: It implements a modern Transformer with RMSNorm, Rotary Embeddings (RoPE), and Value Embeddings (VE).
+
+RTX 5090 Optimizations:
+
+BF16 Precision: Uses bfloat16 to take advantage of the 5090's Tensor Cores.
+
+Fused AdamW: Uses a "fused" optimizer to speed up weight updates.
+
+Memory Management: Sets expandable_segments:True to prevent VRAM fragmentation.
+
+Checkpointing: It automatically saves your progress every 100 steps so you don't lose work if it crashes or hits the 1-hour time budget.
+
+3. main.py (The AI Scientist)
+This is the "Autoresearch" orchestrator. It treats the training process like an experiment that an AI can manage.
+
+The Loop: It runs train.py, waits for it to finish (or crash), and captures the logs.
+
+The "Brain": It sends those logs and the current code to a local Ollama instance (running llama3-8k).
+
+Code Evolution: It asks the LLM to "FIX CRASHES FIRST" and then suggest hyperparameter improvements.
+
+Safety Locks: Since LLMs can sometimes hallucinate or break hardware-specific code, main.py contains regex "Safety Locks" to force-inject correct imports and VRAM settings back into the script before the next run.
+
+Summary of the Workflow
+Prepare: You run python aiprep.py my_data.txt.
+
+Execute: You run python main.py.
+
+Iterate: * main.py starts the training.
+
+If the model OOMs (Out of Memory) or finishes its hour, the logs go to Llama 3.
+
+Llama 3 rewrites train.py to be better (e.g., changing learning rates).
+
+main.py cleans up the GPU memory and starts the next version of the model.
+
+Quick Note on your hardware
+Because you're using a 5090, this script is specifically tuned to keep the DEVICE_BATCH_SIZE at 32 and use Flash Attention (via F.scaled_dot_product_attention). These settings ensure you're getting the most "bang for your buck" without hitting the CUDA memory ceiling.
 
 ![teaser](progress.png)
 
